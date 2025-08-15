@@ -319,30 +319,38 @@ stow_packages() {
         for package in "${packages[@]}"; do
             if [[ "$simulate" == "true" ]]; then
                 log_info "🔍 SIMULATION: Would stow $package configurations..."
-                stow -nv "$package"
+                stow -t "$HOME" -nv "$package"
             else
                 log_info "Stowing $package configurations..."
-                stow -v "$package"
+                stow -t "$HOME" -v "$package"
             fi
         done
     else
         # Non-interactive: install both common and OS-specific
         if [[ "$simulate" == "true" ]]; then
             log_info "🔍 SIMULATION: Would stow common configurations..."
-            stow -nv common
+            stow -t "$HOME" -nv common
             
             log_info "🔍 SIMULATION: Would stow $os-specific configurations..."
-            stow -nv "$os"
+            stow -t "$HOME" -nv "$os"
         else
             log_info "Stowing common configurations..."
-            stow -v common
+            stow -t "$HOME" -v common
             
             log_info "Stowing $os-specific configurations..."
-            stow -v "$os"
+            stow -t "$HOME" -v "$os"
         fi
     fi
     
     log_success "All selected packages stowed successfully!"
+    
+    # Run stow verification check
+    local script_dir="$(dirname "$0")"
+    if [[ -x "$script_dir/scripts/check-stow.sh" && "$simulate" != "true" ]]; then
+        echo ""
+        log_info "Running stow verification check..."
+        "$script_dir/scripts/check-stow.sh" || true  # Don't fail install on check failure
+    fi
 }
 
 # Unstow packages (cleanup)
@@ -352,11 +360,22 @@ unstow_packages() {
     log_info "Unstowing packages for $os..."
     cd "$(dirname "$0")"
     
-    # Unstow in reverse order
-    stow -D "$os" 2>/dev/null || true
-    stow -D common 2>/dev/null || true
+    # Unstow in reverse order with verbose output and explicit target
+    log_info "Unstowing $os-specific configurations..."
+    if stow -t "$HOME" -Dv "$os"; then
+        log_success "$os configurations unstowed successfully"
+    else
+        log_warning "Some $os configurations may not have been fully unstowed"
+    fi
     
-    log_success "Packages unstowed successfully!"
+    log_info "Unstowing common configurations..."
+    if stow -t "$HOME" -Dv common; then
+        log_success "Common configurations unstowed successfully"
+    else
+        log_warning "Some common configurations may not have been fully unstowed"
+    fi
+    
+    log_success "Unstow process completed!"
 }
 
 # Show usage
