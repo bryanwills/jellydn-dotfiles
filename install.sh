@@ -137,6 +137,7 @@ interactive_backup_choice() {
         ".config/foot"
         ".config/polybar"
         ".config/rofi"
+        ".config/mise"
         ".yabairc"
         ".skhdrc"
         ".aerospace.toml"
@@ -203,6 +204,7 @@ backup_existing_dotfiles() {
         ".config/foot"
         ".config/polybar"
         ".config/rofi"
+        ".config/mise"
         ".yabairc"
         ".skhdrc"
         ".aerospace.toml"
@@ -232,10 +234,12 @@ backup_existing_dotfiles() {
             
             if [[ -d "$full_path" ]]; then
                 cp -r "$full_path" "$backup_path"
-                log_info "Backed up directory: $file"
+                rm -rf "$full_path"
+                log_info "Backed up and removed directory: $file"
             else
                 cp "$full_path" "$backup_path"
-                log_info "Backed up file: $file"
+                rm "$full_path"
+                log_info "Backed up and removed file: $file"
             fi
         fi
     done
@@ -380,13 +384,14 @@ unstow_packages() {
 
 # Show usage
 show_usage() {
-    echo "Usage: $0 [install|uninstall|restow|tools|submodules|all|backup]"
+    echo "Usage: $0 [install|uninstall|restow|tools|submodules|all|backup|fish]"
     echo ""
     echo "Commands:"
     echo "  install      - Install dotfiles only (default)"
     echo "  uninstall    - Remove dotfiles symlinks"
     echo "  restow       - Remove and reinstall dotfiles"
     echo "  tools        - Install development tools with mise"
+    echo "  fish         - Install Fish shell and Fisher plugin manager"
     echo "  submodules   - Update git submodules"
     echo "  all          - Install dotfiles, tools, and update submodules"
     echo "  backup       - Backup existing dotfiles only"
@@ -415,6 +420,61 @@ install_tools() {
     else
         log_error "install-tools.sh script not found or not executable"
         return 1
+    fi
+}
+
+# Install Fish shell and Fisher plugin manager
+install_fish() {
+    local os="$1"
+    
+    # Check if fish is already installed
+    if command_exists fish; then
+        log_info "Fish shell is already installed"
+    else
+        log_info "Installing Fish shell..."
+        case "$os" in
+            macos)
+                if command_exists brew; then
+                    brew install fish
+                else
+                    log_error "Homebrew not found. Please install Homebrew first: https://brew.sh/"
+                    return 1
+                fi
+                ;;
+            linux)
+                if command_exists apt; then
+                    sudo apt update && sudo apt install -y fish
+                elif command_exists pacman; then
+                    sudo pacman -S --noconfirm fish
+                elif command_exists dnf; then
+                    sudo dnf install -y fish
+                elif command_exists zypper; then
+                    sudo zypper install -y fish
+                else
+                    log_error "Package manager not found. Please install Fish shell manually."
+                    return 1
+                fi
+                ;;
+        esac
+        log_success "Fish shell installed successfully"
+    fi
+    
+    # Check if Fisher is installed
+    if fish -c "fisher --version" >/dev/null 2>&1; then
+        log_info "Fisher plugin manager is already installed"
+    else
+        log_info "Installing Fisher plugin manager..."
+        fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher"
+        log_success "Fisher plugin manager installed successfully"
+    fi
+    
+    # Install fish plugins if fish_plugins file exists
+    if [[ -f "$HOME/.config/fish/fish_plugins" ]]; then
+        log_info "Installing Fish plugins from fish_plugins..."
+        fish -c "fisher update"
+        log_success "Fish plugins installed successfully"
+    else
+        log_info "No fish_plugins file found, skipping plugin installation"
     fi
 }
 
@@ -549,6 +609,11 @@ main() {
             ;;
         tools)
             install_tools
+            ;;
+        fish)
+            os=$(detect_os)
+            log_info "Detected OS: $os"
+            install_fish "$os"
             ;;
         submodules)
             update_submodules

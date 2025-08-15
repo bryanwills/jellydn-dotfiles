@@ -21,3 +21,5 @@
 
 [delta]
     navigate = true  # use n and N to move between diff sections%
+[safe]
+	directory = /mnt/hgfs/Projects/dotfiles
